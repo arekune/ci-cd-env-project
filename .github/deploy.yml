@@ -1,0 +1,68 @@
+name: Build and Deploy
+on:
+  pull_request:
+    types:
+      - closed
+    branches:
+      - master
+permissions:
+  contents: write
+
+jobs:
+  if_merged:
+    if: github.event.pull_request.merged
+    runs-on: ubuntu-20.04
+    steps:
+    - name: Declare merge
+      run: echo 'The PR was merged.'
+  
+  build-and-deploy:
+    needs: if_merged
+    concurrency: ci-${{ github.ref }}
+    runs-on: ubuntu-20.04
+    
+    outputs:
+      script-file: ${{ steps.publish.outputs.script-file }}
+    
+    steps:
+      - name: Get code
+        uses: actions/checkout@v3
+      
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.npm 
+          key: deps-node-modules-${{ hashFiles('**/package-lock.json') }}
+      
+      - name: Install and Build
+        run: |
+          npm ci
+          npm run build
+      
+      - name: Publish JS filename
+        id: publish
+        run: find dist/assets/*.js -type f -execdir echo 'script-file={}' >> $GITHUB_OUTPUT ';'
+        # 'script-file' is just an arbitrary name for the output value
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: dist-files  # artifact name
+          path: dist
+      
+      - name: Get build artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: dist-files
+
+      - name: Output artifact contents  # just for show
+        run: ls
+
+      - name: Output filename
+        run: echo "${{ needs.build.outputs.script-file }}"  # 'script-file' is defined in the outputs
+        # 'needs' object contains the outputs of all jobs that are dependencies of the current job
+      
+      - name: Deploy
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          folder: build
