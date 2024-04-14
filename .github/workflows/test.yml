@@ -1,0 +1,32 @@
+name: Lint and Test
+on:
+  push:
+    branches:
+      - dev
+
+jobs:
+  test:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.npm  # path of npm's internal dependency cache, can use across jobs and workflows
+          key: deps-node-modules-${{ hashFiles('**/package-lock.json') }}
+          # the key is used to retrieve the cache in the future and to recreate the cached contents on runners
+          # the key also indicates whether the cache should be discarded because some dependency changed
+          # we give the key a partly dynamic name that changes when the cache should be discarded
+          # the hashFiles function creates a unique hash based on a filepath passed to it
+          # i.e. the hash changes whenever the file (or its contents) passed to the function changes
+      
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint code
+        run: npm run lint
+
+      - name: Test code
+        run: npm run test
